@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Periodic Table Explorer — Full (1–118)</title>
+<style>
+  :root{
+    --bg:#071428; --muted:#bcd7e6; --accent:#00e5ff;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, Arial;
+    background: linear-gradient(135deg,#071428 0%, #0b2a3a 60%, #072a2a 100%);
+    color:#e6eef6; display:flex; height:100vh;
+  }
+  .sidebar{width:340px;padding:22px;background:linear-gradient(180deg, rgba(255,255,255,0.03), rgba(255,255,255,0.01));border-right:1px solid rgba(255,255,255,0.04);display:flex;flex-direction:column;gap:12px;overflow:auto}
+  .title{display:flex;gap:12px;align-items:center}
+  .logo{width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,#00e5ff,#6a5cff);display:flex;align-items:center;justify-content:center;color:#05222a;font-weight:700;font-size:20px}
+  h1{margin:0;font-size:18px}
+  p.lead{margin:0;color:var(--muted);font-size:13px}
+  .controls{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+  .search{display:flex;gap:8px}
+  .search input{flex:1;padding:10px 12px;border-radius:10px;border:none;background:rgba(255,255,255,0.03);color:inherit}
+  .btn{padding:10px 12px;border-radius:10px;border:none;background:var(--accent);color:#00131a;font-weight:600;cursor:pointer}
+  .filters{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .chip{padding:8px 10px;border-radius:999px;background:rgba(255,255,255,0.04);font-size:13px;cursor:pointer}
+  .chip.active{background:linear-gradient(90deg,#00e5ff18,#00e5ff33);border:1px solid rgba(0,229,255,0.12)}
+  .info{margin-top:12px;padding:12px;border-radius:10px;background:rgba(255,255,255,0.04);font-size:14px;line-height:1.35}
+  .info h2{margin:0 0 6px 0}
+  .info .meta{color:var(--muted);font-size:13px;margin-bottom:6px}
+  .main{flex:1;padding:18px;display:flex;flex-direction:column;gap:12px;overflow:auto}
+  .legend{display:flex;gap:10px;align-items:center}
+  .grid{margin-top:8px;display:grid;grid-template-columns: repeat(18, 1fr);gap:8px;align-items:start}
+  .element{background:rgba(255,255,255,0.03);border-radius:8px;padding:8px;min-height:72px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;position:relative;transition:transform .12s, box-shadow .12s}
+  .element:hover{transform:translateY(-6px);box-shadow:0 10px 30px rgba(2,6,23,0.6)}
+  .sym{font-size:18px;font-weight:700}
+  .num{font-size:12px;color:var(--muted)}
+  .mass{font-size:11px;color:#9fb3c8}
+  .name{font-size:12px;color:var(--muted)}
+  .tooltip{position:absolute;left:8px;right:8px;top:8px;display:none;padding:6px;border-radius:6px;background:rgba(2,6,23,0.85);font-size:12px;color:#dbeafe}
+  .element:hover .tooltip{display:block;z-index:40}
+
+  /* category colors */
+  .alkali{background:linear-gradient(180deg,#ffefc2,#ffd18a); color:#2b1100}
+  .alkaline{background:linear-gradient(180deg,#e6ffdf,#b7ff9a); color:#042b04}
+  .transition{background:linear-gradient(180deg,#e7f0ff,#b3d0ff); color:#041a2c}
+  .post{background:linear-gradient(180deg,#ffdfff,#ffbfe6); color:#2b0424}
+  .metalloid{background:linear-gradient(180deg,#fff7c9,#ffe59a); color:#2b1f00}
+  .nonmetal{background:linear-gradient(180deg,#d6fff7,#aafaf0); color:#00332b}
+  .halogen{background:linear-gradient(180deg,#ffd6d6,#ffaaaa); color:#2b0000}
+  .noble{background:linear-gradient(180deg,#e8e8ff,#c9c9ff); color:#00154d}
+  .lanth{background:linear-gradient(180deg,#f0e6ff,#d6c9ff); color:#1b0536}
+  .actin{background:linear-gradient(180deg,#ffe6f0,#ffd6ea); color:#2b0639}
+
+  @media (max-width:900px){
+    body{flex-direction:column}
+    .sidebar{width:100%;height:auto;border-right:none;border-bottom:1px solid rgba(255,255,255,0.04)}
+    .main{height:calc(100vh - 220px)}
+    .grid{grid-template-columns: repeat(9, 1fr)}
+  }
+</style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="title">
+      <div class="logo">PT</div>
+      <div>
+        <h1>Periodic Table Explorer</h1>
+        <p class="lead">Full elements 1–118 • Click a tile for details</p>
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="search">
+        <input id="search" placeholder="Search by symbol, name or number (e.g. O, Oxygen, 8)" />
+        <button class="btn" onclick="doSearch()">Go</button>
+      </div>
+
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
+        <div class="chip" onclick="filterNone()">All</div>
+        <div class="chip" onclick="applyFilter('alkali')">Alkali</div>
+        <div class="chip" onclick="applyFilter('alkaline')">Alkaline</div>
+        <div class="chip" onclick="applyFilter('transition')">Transition</div>
+        <div class="chip" onclick="applyFilter('nonmetal')">Nonmetals</div>
+        <div class="chip" onclick="applyFilter('noble')">Noble gases</div>
+        <div class="chip" onclick="applyFilter('halogen')">Halogens</div>
+      </div>
+
+      <div class="info" id="infoPanel">
+        <h2 id="infoName">No element selected</h2>
+        <div class="meta" id="infoMeta">Click any tile to see details</div>
+        <p id="infoText">Atomic number, mass, group/period and a short fact will appear here.</p>
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <div class="legend">
+        <div class="dot alkali" style="width:14px;height:14px;border-radius:3px"></div><small style="color:var(--muted)">Alkali</small>
+        <div style="width:8px"></div>
+        <div class="dot alkaline"></div><small style="color:var(--muted)">Alkaline</small>
+        <div style="width:8px"></div>
+        <div class="dot transition"></div><small style="color:var(--muted)">Transition</small>
+        <div style="width:8px"></div>
+        <div class="dot nonmetal"></div><small style="color:var(--muted)">Nonmetal</small>
+      </div>
+
+      <div style="color:var(--muted);font-size:13px">Interactive periodic table — 1–118</div>
+    </div>
+
+    <div class="grid" id="grid"></div>
+  </main>
+
+<script>
+// Full 118 elements data (compact facts)
+const elements = [
+{z:1,s:'H',name:'Hydrogen',mass:'1.008',cat:'nonmetal',group:1,period:1,fact:'Lightest element; fuels stars.'},
+{z:2,s:'He',name:'Helium',mass:'4.0026',cat:'noble',group:18,period:1,fact:'Used in balloons and cryogenics.'},
+{z:3,s:'Li',name:'Lithium',mass:'6.94',cat:'alkali',group:1,period:2,fact:'Used in batteries.'},
+{z:4,s:'Be',name:'Beryllium',mass:'9.0122',cat:'alkaline',group:2,period:2,fact:'Light, stiff metal.'},
+{z:5,s:'B',name:'Boron',mass:'10.81',cat:'metalloid',group:13,period:2,fact:'Used in glass and detergents.'},
+{z:6,s:'C',name:'Carbon',mass:'12.011',cat:'nonmetal',group:14,period:2,fact:'Basis of organic chemistry.'},
+{z:7,s:'N',name:'Nitrogen',mass:'14.007',cat:'nonmetal',group:15,period:2,fact:'~78% of air.'},
+{z:8,s:'O',name:'Oxygen',mass:'15.999',cat:'nonmetal',group:16,period:2,fact:'Essential for respiration.'},
+{z:9,s:'F',name:'Fluorine',mass:'18.998',cat:'halogen',group:17,period:2,fact:'Most reactive element.'},
+{z:10,s:'Ne',name:'Neon',mass:'20.180',cat:'noble',group:18,period:2,fact:'Used in neon signs.'},
+
+{z:11,s:'Na',name:'Sodium',mass:'22.990',cat:'alkali',group:1,period:3,fact:'Found in table salt.'},
+{z:12,s:'Mg',name:'Magnesium',mass:'24.305',cat:'alkaline',group:2,period:3,fact:'Biologically important metal.'},
+{z:13,s:'Al',name:'Aluminium',mass:'26.982',cat:'post',group:13,period:3,fact:'Lightweight metal.'},
+{z:14,s:'Si',name:'Silicon',mass:'28.085',cat:'metalloid',group:14,period:3,fact:'Semiconductor.'},
+{z:15,s:'P',name:'Phosphorus',mass:'30.974',cat:'nonmetal',group:15,period:3,fact:'Essential in DNA.'},
+{z:16,s:'S',name:'Sulfur',mass:'32.06',cat:'nonmetal',group:16,period:3,fact:'Used in fertilizers.'},
+{z:17,s:'Cl',name:'Chlorine',mass:'35.45',cat:'halogen',group:17,period:3,fact:'Disinfects water.'},
+{z:18,s:'Ar',name:'Argon',mass:'39.948',cat:'noble',group:18,period:3,fact:'Inert shielding gas.'},
+
+{z:19,s:'K',name:'Potassium',mass:'39.098',cat:'alkali',group:1,period:4,fact:'Vital electrolyte.'},
+{z:20,s:'Ca',name:'Calcium',mass:'40.078',cat:'alkaline',group:2,period:4,fact:'Key in bones.'},
+{z:21,s:'Sc',name:'Scandium',mass:'44.956',cat:'transition',group:3,period:4,fact:'Used in alloys.'},
+{z:22,s:'Ti',name:'Titanium',mass:'47.867',cat:'transition',group:4,period:4,fact:'Strong, corrosion resistant.'},
+{z:23,s:'V',name:'Vanadium',mass:'50.942',cat:'transition',group:5,period:4,fact:'Strengthens steel.'},
+{z:24,s:'Cr',name:'Chromium',mass:'51.996',cat:'transition',group:6,period:4,fact:'Used in chrome plating.'},
+{z:25,s:'Mn',name:'Manganese',mass:'54.938',cat:'transition',group:7,period:4,fact:'Used in steel production.'},
+{z:26,s:'Fe',name:'Iron',mass:'55.845',cat:'transition',group:8,period:4,fact:'Key metal; hemoglobin contains Fe.'},
+{z:27,s:'Co',name:'Cobalt',mass:'58.933',cat:'transition',group:9,period:4,fact:'Used in batteries & alloys.'},
+{z:28,s:'Ni',name:'Nickel',mass:'58.693',cat:'transition',group:10,period:4,fact:'Used in plating & coins.'},
+{z:29,s:'Cu',name:'Copper',mass:'63.546',cat:'transition',group:11,period:4,fact:'Excellent conductor.'},
+{z:30,s:'Zn',name:'Zinc',mass:'65.38',cat:'transition',group:12,period:4,fact:'Used for galvanizing.'},
+
+{z:31,s:'Ga',name:'Gallium',mass:'69.723',cat:'post',group:13,period:4,fact:'Melts near 30°C.'},
+{z:32,s:'Ge',name:'Germanium',mass:'72.630',cat:'metalloid',group:14,period:4,fact:'Early semiconductor.'},
+{z:33,s:'As',name:'Arsenic',mass:'74.922',cat:'metalloid',group:15,period:4,fact:'Toxic; historic pesticide.'},
+{z:34,s:'Se',name:'Selenium',mass:'78.971',cat:'nonmetal',group:16,period:4,fact:'Trace biological element.'},
+{z:35,s:'Br',name:'Bromine',mass:'79.904',cat:'halogen',group:17,period:4,fact:'Only nonmetal liquid at RT.'},
+{z:36,s:'Kr',name:'Krypton',mass:'83.798',cat:'noble',group:18,period:4,fact:'Used in lighting.'},
+
+{z:37,s:'Rb',name:'Rubidium',mass:'85.468',cat:'alkali',group:1,period:5,fact:'Highly reactive alkali metal.'},
+{z:38,s:'Sr',name:'Strontium',mass:'87.62',cat:'alkaline',group:2,period:5,fact:'Used in fireworks (red color).'},
+{z:39,s:'Y',name:'Yttrium',mass:'88.906',cat:'transition',group:3,period:5,fact:'Used in LEDs and superconductors.'},
+{z:40,s:'Zr',name:'Zirconium',mass:'91.224',cat:'transition',group:4,period:5,fact:'Corrosion resistant.'},
+{z:41,s:'Nb',name:'Niobium',mass:'92.906',cat:'transition',group:5,period:5,fact:'Used in superconducting alloys.'},
+{z:42,s:'Mo',name:'Molybdenum',mass:'95.95',cat:'transition',group:6,period:5,fact:'Alloy steel strengthening.'},
+{z:43,s:'Tc',name:'Technetium',mass:'98',cat:'transition',group:7,period:5,fact:'Light radioactive metal (synthetic).'},
+{z:44,s:'Ru',name:'Ruthenium',mass:'101.07',cat:'transition',group:8,period:5,fact:'Used in electronics.'},
+{z:45,s:'Rh',name:'Rhodium',mass:'102.91',cat:'transition',group:9,period:5,fact:'Platinum-group metal, catalytic.'},
+{z:46,s:'Pd',name:'Palladium',mass:'106.42',cat:'transition',group:10,period:5,fact:'Catalyst in converters.'},
+{z:47,s:'Ag',name:'Silver',mass:'107.87',cat:'transition',group:11,period:5,fact:'Best conductor of electricity.'},
+{z:48,s:'Cd',name:'Cadmium',mass:'112.41',cat:'transition',group:12,period:5,fact:'Toxic; used in batteries (old).'},
+
+{z:49,s:'In',name:'Indium',mass:'114.82',cat:'post',group:13,period:5,fact:'Used in touchscreens.'},
+{z:50,s:'Sn',name:'Tin',mass:'118.71',cat:'post',group:14,period:5,fact:'Used in alloys & solder.'},
+{z:51,s:'Sb',name:'Antimony',mass:'121.76',cat:'metalloid',group:15,period:5,fact:'Used in flame retardants.'},
+{z:52,s:'Te',name:'Tellurium',mass:'127.60',cat:'metalloid',group:16,period:5,fact:'Used in alloys & semiconductors.'},
+{z:53,s:'I',name:'Iodine',mass:'126.90',cat:'halogen',group:17,period:5,fact:'Essential nutrient; disinfectant.'},
+{z:54,s:'Xe',name:'Xenon',mass:'131.29',cat:'noble',group:18,period:5,fact:'Used in flash lamps & anesthesia.'},
+
+{z:55,s:'Cs',name:'Cesium',mass:'132.91',cat:'alkali',group:1,period:6,fact:'Highly reactive; atomic clocks.'},
+{z:56,s:'Ba',name:'Barium',mass:'137.33',cat:'alkaline',group:2,period:6,fact:'Used in X-ray contrast agents.'},
+{z:57,s:'La',name:'Lanthanum',mass:'138.91',cat:'lanth',group:3,period:6,fact:'Start of lanthanide series.'},
+{z:58,s:'Ce',name:'Cerium',mass:'140.12',cat:'lanth',group:3,period:6,fact:'Used in catalytic converters.'},
+{z:59,s:'Pr',name:'Praseodymium',mass:'140.91',cat:'lanth',group:3,period:6,fact:'Used in magnets.'},
+{z:60,s:'Nd',name:'Neodymium',mass:'144.24',cat:'lanth',group:3,period:6,fact:'Strong permanent magnets.'},
+{z:61,s:'Pm',name:'Promethium',mass:'145',cat:'lanth',group:3,period:6,fact:'Radioactive, rare.'},
+{z:62,s:'Sm',name:'Samarium',mass:'150.36',cat:'lanth',group:3,period:6,fact:'Used in magnets & lasers.'},
+{z:63,s:'Eu',name:'Europium',mass:'151.96',cat:'lanth',group:3,period:6,fact:'Used in red phosphors.'},
+{z:64,s:'Gd',name:'Gadolinium',mass:'157.25',cat:'lanth',group:3,period:6,fact:'MRI contrast agent.'},
+{z:65,s:'Tb',name:'Terbium',mass:'158.93',cat:'lanth',group:3,period:6,fact:'Used in green phosphors.'},
+{z:66,s:'Dy',name:'Dysprosium',mass:'162.50',cat:'lanth',group:3,period:6,fact:'Used in magnets at high temp.'},
+{z:67,s:'Ho',name:'Holmium',mass:'164.93',cat:'lanth',group:3,period:6,fact:'High magnetic strength.'},
+{z:68,s:'Er',name:'Erbium',mass:'167.26',cat:'lanth',group:3,period:6,fact:'Used in fiber amplifiers.'},
+{z:69,s:'Tm',name:'Thulium',mass:'168.93',cat:'lanth',group:3,period:6,fact:'Least abundant lanthanide.'},
+{z:70,s:'Yb',name:'Ytterbium',mass:'173.05',cat:'lanth',group:3,period:6,fact:'Used in clocks and lasers.'},
+{z:71,s:'Lu',name:'Lutetium',mass:'174.97',cat:'lanth',group:3,period:6,fact:'Last lanthanide.'},
+
+{z:72,s:'Hf',name:'Hafnium',mass:'178.49',cat:'transition',group:4,period:6,fact:'Used in nuclear control rods.'},
+{z:73,s:'Ta',name:'Tantalum',mass:'180.95',cat:'transition',group:5,period:6,fact:'Used in capacitors.'},
+{z:74,s:'W',name:'Tungsten',mass:'183.84',cat:'transition',group:6,period:6,fact:'Highest melting point metal.'},
+{z:75,s:'Re',name:'Rhenium',mass:'186.21',cat:'transition',group:7,period:6,fact:'Used in jet engine alloys.'},
+{z:76,s:'Os',name:'Osmium',mass:'190.23',cat:'transition',group:8,period:6,fact:'Very dense metal.'},
+{z:77,s:'Ir',name:'Iridium',mass:'192.22',cat:'transition',group:9,period:6,fact:'Very corrosion resistant.'},
+{z:78,s:'Pt',name:'Platinum',mass:'195.08',cat:'transition',group:10,period:6,fact:'Catalyst & jewelry.'},
+{z:79,s:'Au',name:'Gold',mass:'196.97',cat:'transition',group:11,period:6,fact:'Highly unreactive & valuable.'},
+{z:80,s:'Hg',name:'Mercury',mass:'200.59',cat:'transition',group:12,period:6,fact:'Liquid metal at room temp.'},
+{z:81,s:'Tl',name:'Thallium',mass:'204.38',cat:'post',group:13,period:6,fact:'Toxic heavy metal.'},
+{z:82,s:'Pb',name:'Lead',mass:'207.2',cat:'post',group:14,period:6,fact:'Toxic; used historically in pipes.'},
+{z:83,s:'Bi',name:'Bismuth',mass:'208.98',cat:'post',group:15,period:6,fact:'Low toxicity, used in medicines.'},
+{z:84,s:'Po',name:'Polonium',mass:'209',cat:'post',group:16,period:6,fact:'Highly radioactive.'},
+{z:85,s:'At',name:'Astatine',mass:'210',cat:'halogen',group:17,period:6,fact:'Extremely rare, radioactive.'},
+{z:86,s:'Rn',name:'Radon',mass:'222',cat:'noble',group:18,period:6,fact:'Radioactive noble gas.'},
+
+{z:87,s:'Fr',name:'Francium',mass:'223',cat:'alkali',group:1,period:7,fact:'Extremely rare, highly radioactive.'},
+{z:88,s:'Ra',name:'Radium',mass:'226',cat:'alkaline',group:2,period:7,fact:'Radioactive, used historically in luminous paint.'},
+{z:89,s:'Ac',name:'Actinium',mass:'227',cat:'actin',group:3,period:7,fact:'Start of actinide series.'},
+{z:90,s:'Th',name:'Thorium',mass:'232.04',cat:'actin',group:3,period:7,fact:'Potential nuclear fuel.'},
+{z:91,s:'Pa',name:'Protactinium',mass:'231.04',cat:'actin',group:3,period:7,fact:'Rare, radioactive.'},
+{z:92,s:'U',name:'Uranium',mass:'238.03',cat:'actin',group:3,period:7,fact:'Nuclear fuel.'},
+{z:93,s:'Np',name:'Neptunium',mass:'237',cat:'actin',group:3,period:7,fact:'Synthetic radioactive element.'},
+{z:94,s:'Pu',name:'Plutonium',mass:'244',cat:'actin',group:3,period:7,fact:'Used in nuclear weapons & reactors.'},
+{z:95,s:'Am',name:'Americium',mass:'243',cat:'actin',group:3,period:7,fact:'Used in smoke detectors.'},
+{z:96,s:'Cm',name:'Curium',mass:'247',cat:'actin',group:3,period:7,fact:'Highly radioactive, synthetic.'},
+{z:97,s:'Bk',name:'Berkelium',mass:'247',cat:'actin',group:3,period:7,fact:'Synthetic transuranic element.'},
+{z:98,s:'Cf',name:'Californium',mass:'251',cat:'actin',group:3,period:7,fact:'Used as neutron source.'},
+{z:99,s:'Es',name:'Einsteinium',mass:'252',cat:'actin',group:3,period:7,fact:'Produced in reactors; synthetic.'},
+{z:100,s:'Fm',name:'Fermium',mass:'257',cat:'actin',group:3,period:7,fact:'Highly radioactive, synthetic.'},
+{z:101,s:'Md',name:'Mendelevium',mass:'258',cat:'actin',group:3,period:7,fact:'Named for Mendeleev.'},
+{z:102,s:'No',name:'Nobelium',mass:'259',cat:'actin',group:3,period:7,fact:'Synthetic, short-lived.'},
+{z:103,s:'Lr',name:'Lawrencium',mass:'266',cat:'actin',group:3,period:7,fact:'Heaviest actinide.'},
+{z:104,s:'Rf',name:'Rutherfordium',mass:'267',cat:'transition',group:4,period:7,fact:'Synthetic transactinide.'},
+{z:105,s:'Db',name:'Dubnium',mass:'268',cat:'transition',group:5,period:7,fact:'Synthetic transactinide.'},
+{z:106,s:'Sg',name:'Seaborgium',mass:'269',cat:'transition',group:6,period:7,fact:'Named for Glenn Seaborg.'},
+{z:107,s:'Bh',name:'Bohrium',mass:'270',cat:'transition',group:7,period:7,fact:'Synthetic transactinide.'},
+{z:108,s:'Hs',name:'Hassium',mass:'269',cat:'transition',group:8,period:7,fact:'Synthetic; named after Hesse.'},
+{z:109,s:'Mt',name:'Meitnerium',mass:'278',cat:'transition',group:9,period:7,fact:'Very short-lived synthetic.'},
+{z:110,s:'Ds',name:'Darmstadtium',mass:'281',cat:'transition',group:10,period:7,fact:'Heavy synthetic element.'},
+{z:111,s:'Rg',name:'Roentgenium',mass:'282',cat:'transition',group:11,period:7,fact:'Named after Röntgen.'},
+{z:112,s:'Cn',name:'Copernicium',mass:'285',cat:'transition',group:12,period:7,fact:'Superheavy synthetic element.'},
+{z:113,s:'Nh',name:'Nihonium',mass:'286',cat:'post',group:13,period:7,fact:'Named for Japan (Nihon).'},
+{z:114,s:'Fl',name:'Flerovium',mass:'289',cat:'post',group:14,period:7,fact:'Superheavy, short-lived.'},
+{z:115,s:'Mc',name:'Moscovium',mass:'290',cat:'post',group:15,period:7,fact:'Named after Moscow region.'},
+{z:116,s:'Lv',name:'Livermorium',mass:'293',cat:'post',group:16,period:7,fact:'Named after Lawrence Livermore Lab.'},
+{z:117,s:'Ts',name:'Tennessine',mass:'294',cat:'halogen',group:17,period:7,fact:'Named for Tennessee.'},
+{z:118,s:'Og',name:'Oganesson',mass:'294',cat:'noble',group:18,period:7,fact:'Heaviest known element; synthetic.'}
+];
+
+// quick lookup
+const lookup = {};
+elements.forEach(el=>{
+  lookup[el.s.toLowerCase()] = el;
+  lookup[el.name.toLowerCase()] = el;
+  lookup[String(el.z)] = el;
+});
+
+const grid = document.getElementById('grid');
+const infoName = document.getElementById('infoName');
+const infoMeta = document.getElementById('infoMeta');
+const infoText = document.getElementById('infoText');
+const searchInput = document.getElementById('search');
+
+function renderGrid(filter=null, query=null){
+  grid.innerHTML = '';
+  const rows = 7;
+  const cols = 18;
+  let cells = Array.from({length:rows},()=>Array(cols).fill(null));
+
+  // place elements by period and group; lanth/actin placed at group 3 in periods 6/7
+  elements.forEach(el=>{
+    let r = (el.period || 1) - 1;
+    let c = (el.group && el.group>=1 && el.group<=18) ? el.group - 1 : 2; // default group 3 if missing
+    // special handling for lanthanides/actinides: many assigned group 3 above
+    if(r<0 || r>=rows || c<0 || c>=cols){
+      // fallback place in last columns
+      for(let cc=0;cc<cols;cc++){
+        if(!cells[r] || !cells[r][cc]){ if(!cells[r]) continue; cells[r][cc]=el; break; }
+      }
+    } else {
+      cells[r][c] = el;
+    }
+  });
+
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      const el = cells[r][c];
+      const cell = document.createElement('div');
+      cell.className = 'element';
+      if(el){
+        cell.classList.add(categoryClass(el.cat));
+        cell.innerHTML = `
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div class="num">${el.z}</div>
+            <div style="text-align:right"><div class="mass">${el.mass}</div></div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center;margin-top:4px">
+            <div class="sym">${el.s}</div>
+            <div class="name">${el.name}</div>
+          </div>
+          <div class="tooltip"><strong>${el.s} — ${el.name}</strong><br>Atomic #${el.z} • ${el.mass}</div>
+        `;
+        cell.onclick = ()=>showInfo(el);
+
+        let hide = false;
+        if(filter && filter!=='all') if(el.cat !== filter) hide = true;
+        if(query){
+          const q = query.toLowerCase();
+          if(!(String(el.z).includes(q) || el.s.toLowerCase().includes(q) || el.name.toLowerCase().includes(q))) hide = true;
+        }
+        if(hide) cell.style.opacity = 0.12;
+      } else {
+        cell.style.visibility = 'hidden';
+      }
+      grid.appendChild(cell);
+    }
+  }
+}
+
+function categoryClass(cat){
+  switch(cat){
+    case 'alkali': return 'alkali';
+    case 'alkaline': return 'alkaline';
+    case 'transition': return 'transition';
+    case 'post': return 'post';
+    case 'metalloid': return 'metalloid';
+    case 'nonmetal': return 'nonmetal';
+    case 'halogen': return 'halogen';
+    case 'noble': return 'noble';
+    case 'lanth': return 'lanth';
+    case 'actin': return 'actin';
+    default: return '';
+  }
+}
+
+function showInfo(el){
+  infoName.innerText = `${el.name} (${el.s})`;
+  infoMeta.innerText = `Atomic number ${el.z} • Group ${el.group || '-'} • Period ${el.period}`;
+  infoText.innerHTML = `<strong>Atomic mass:</strong> ${el.mass}<br><strong>Category:</strong> ${capitalize(el.cat)}<br><br>${el.fact}`;
+}
+
+function capitalize(s){ if(!s) return s; return s.charAt(0).toUpperCase()+s.slice(1); }
+
+let activeFilter = null;
+function applyFilter(cat){ activeFilter = cat; renderGrid(cat, searchInput.value.trim() || null); highlightActiveChip(cat); }
+function filterNone(){ activeFilter = null; renderGrid(null, searchInput.value.trim() || null); highlightActiveChip(null); }
+
+function highlightActiveChip(cat){
+  document.querySelectorAll('.chip').forEach(ch=>{
+    const text = ch.textContent.trim().toLowerCase();
+    if(!cat && text==='all') ch.classList.add('active'); else ch.classList.remove('active');
+    if(cat && text.includes(cat)) ch.classList.add('active');
+  });
+}
+
+function doSearch(){
+  const q = searchInput.value.trim();
+  if(!q){ renderGrid(activeFilter, null); return; }
+  const low = q.toLowerCase();
+  if(lookup[low]){
+    showInfo(lookup[low]);
+    renderGrid(activeFilter, q);
+    setTimeout(()=>{ document.querySelectorAll('.element').forEach(el=>{
+      if(el.innerText.toLowerCase().includes(lookup[low].s.toLowerCase())) el.style.boxShadow='0 18px 40px rgba(0,255,255,0.12)';
+    }) },50);
+    return;
+  }
+  renderGrid(activeFilter, q);
+}
+
+renderGrid();
+showInfo(elements[0]);
+searchInput.addEventListener('keydown', (e)=>{ if(e.key==='Enter') doSearch(); });
+
+</script>
+</body>
+</html>
